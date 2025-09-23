@@ -14,9 +14,9 @@ router.put('/:id', routes.updateUser);
 
 
 
-//router.get('/:id/picture', routes.getUser);
-//router.post('/:id/picture', routes.getUser);
-//router.delete('/:id/picture', routes.getUser);
+router.get('/:id/picture', routes.getPicture);
+//router.post('/:id/picture', routes.getUserPicture);
+//router.delete('/:id/picture', routes.getUserPicture);
 
 
 export default router;

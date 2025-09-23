@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import AuthService from '../services/authService';
+import FileService from '../services/fileService';
 import { User } from '../types/user';
 
 
@@ -108,7 +109,7 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
     next(err);
   }
 };
-
+*/
 export const getPicture = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { stream, contentType } = await FileService.getProfilePicture(req.user!.id);
@@ -118,7 +119,7 @@ export const getPicture = async (req: Request, res: Response, next: NextFunction
     next(err);
   }
 };
-
+/*
 export const uploadPicture = async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.file) {
@@ -152,4 +153,5 @@ export default {
   setPassword,
   createUser,
   updateUser,
+  getPicture,
 };
