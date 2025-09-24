@@ -1,10 +1,10 @@
 
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import bcrypt from 'bcrypt';
 import db from '../db';
 import { User,UserRow } from '../types/user';
 import jwtUtils from '../utils/jwt';
-import ejs from 'ejs';
 
 const RESET_TTL = 1000 * 60 * 60;         // 1h
 const INVITE_TTL = 1000 * 60 * 60 * 24 * 7; // 7d
@@ -17,13 +17,16 @@ class AuthService {
       .orWhere({ email: user.email })
       .first();
     if (existing) throw new Error('User already exists with that username or email');
-    // create invite token
+
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(user.password, saltRounds);
+
     const invite_token = crypto.randomBytes(6).toString('hex');
     const invite_token_expires = new Date(Date.now() + INVITE_TTL);
     await db<UserRow>('users')
       .insert({
         username: user.username,
-        password: user.password,
+        password: hashedPassword,
         email: user.email,
         first_name: user.first_name,
         last_name:  user.last_name,
@@ -41,16 +44,27 @@ class AuthService {
       }
     });
     const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${user.username}`;
-   
-    const template = `
+
+    const sanitizeForTemplate = (input: string): string => {
+      return input
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/&/g, '&amp;');
+    };
+
+    const safeFirstName = sanitizeForTemplate(user.first_name);
+    const safeLastName = sanitizeForTemplate(user.last_name);
+
+    const htmlBody = `
       <html>
         <body>
-          <h1>Hello ${user.first_name} ${user.last_name}</h1>
-          <p>Click <a href="${ link }">here</a> to activate your account.</p>
+          <h1>Hello ${safeFirstName} ${safeLastName}</h1>
+          <p>Click <a href="${link}">here</a> to activate your account.</p>
         </body>
       </html>`;
-    const htmlBody = ejs.render(template);
-    
+
     await transporter.sendMail({
       from: "info@example.com",
       to: user.email,
@@ -82,7 +96,10 @@ class AuthService {
       .andWhere('activated', true)
       .first();
     if (!user) throw new Error('Invalid username or not activated');
-    if (password != user.password) throw new Error('Invalid password');
+
+    const isValidPassword = await bcrypt.compare(password, user.password);
+    if (!isValidPassword) throw new Error('Invalid password');
+
     return user;
   }
 
@@ -128,10 +145,13 @@ class AuthService {
       .first();
     if (!row) throw new Error('Invalid or expired reset token');
 
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
     await db('users')
       .where({ id: row.id })
       .update({
-        password: newPassword,
+        password: hashedPassword,
         reset_password_token: null,
         reset_password_expires: null
       });
@@ -144,9 +164,13 @@ class AuthService {
       .first();
     if (!row) throw new Error('Invalid or expired invite token');
 
+    // Hash new password before storing
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
     await db('users')
       .update({
-        password: newPassword,
+        password: hashedPassword,
         invite_token: null,
         invite_token_expires: null,
         activated: true

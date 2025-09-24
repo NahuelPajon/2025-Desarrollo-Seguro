@@ -17,7 +17,7 @@ services:
       dockerfile: DockerFile
     container_name: backend
     ports:
-      - "5000:3000"
+      - "5001:3000"
     environment:
       - DB_HOST=postgres
       - DB_USER=user
@@ -28,6 +28,7 @@ services:
       - SMTP_PORT=1025
       - SMTP_USER=seed
       - SMTP_PASS=seed
+      - JWT_SECRET=gen-secret-key
     restart: unless-stopped
     depends_on:
       postgres:
@@ -39,7 +40,7 @@ services:
       retries: 5
     command: sh -c "npx knex --knexfile src/knexfile.ts migrate:latest && cd dist/src/ && node index.js"
     # command to seed data: npx knex seed:run --knexfile src/knexfile.ts
-    
+
   #add a postgres service
   postgres:
     image: postgres:latest
