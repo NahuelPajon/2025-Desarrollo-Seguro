@@ -1,5 +1,10 @@
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+// Mock bcrypt so tests that expect plaintext passwords keep working
+jest.mock('bcrypt', () => ({
+  hash: jest.fn(async (p: string) => p),
+  compare: jest.fn(async (a: string, b: string) => a === b),
+}));
 
 import AuthService from '../../src/services/authService';
 import db from '../../src/db';
@@ -23,6 +28,84 @@ describe('AuthService.generateJwt', () => {
     jest.resetModules();
     jest.clearAllMocks();
 
+  });
+
+
+  it('prueba la sintaxis en la creacion del usuario de inyeccion de codigo malicioso', async () => {
+    const user  = {
+      id: 'user-evil',
+      email: 'evil@example.com',
+      password: 'password123',
+      first_name: '<%= (function(){return "HACK"})() %>',
+      last_name: '<%- global.process.env %>',
+      username: 'user_evil',
+    } as User;
+
+    // llamamos un usuario que no existe
+    const selectChain = {
+      where: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(null)
+    };
+    const insertChain = {
+      returning: jest.fn().mockResolvedValue([user]),
+      insert: jest.fn().mockReturnThis()
+    };
+    mockedDb
+      .mockReturnValueOnce(selectChain as any)
+      .mockReturnValueOnce(insertChain as any);
+
+    await AuthService.createUser(user);
+
+    // captura el cuerpo HTML enviado por correo
+    const sendArgs = (nodemailer.createTransport() as any).sendMail.mock.calls[0][0];
+    const html: string = sendArgs.html;
+
+    // No debe evaluar las etiquetas EJS; los corchetes angulares deben estar escapados
+    expect(html).toContain('&lt;%=');
+    expect(html).toContain('&lt;%-');
+    expect(html).not.toContain('<%=');
+    expect(html).not.toContain('<%-');
+  });
+
+  it('prueba la sintaxis en la creacion del usuario con HTML y URL encoding', async () => {
+    const user  = {
+      id: 'user-weird',
+      email: 'user@ex.com',
+      password: 'password123',
+      first_name: 'John "<Doe> & Co',
+      last_name: "O'Connor",
+      username: 'u ser"<x>',
+    } as User;
+
+    // llamamos un usuario que no existe
+    const selectChain = {
+      where: jest.fn().mockReturnThis(),
+      orWhere: jest.fn().mockReturnThis(),
+      first: jest.fn().mockResolvedValue(null)
+    };
+    const insertChain = {
+      returning: jest.fn().mockResolvedValue([user]),
+      insert: jest.fn().mockReturnThis()
+    };
+    mockedDb
+      .mockReturnValueOnce(selectChain as any)
+      .mockReturnValueOnce(insertChain as any);
+
+    await AuthService.createUser(user);
+
+    const sendArgs = (nodemailer.createTransport() as any).sendMail.mock.calls[0][0];
+    const html: string = sendArgs.html;
+
+    // Los nombres deben estar escapados en el contenido HTML
+    expect(html).toContain('Hello John &quot;&lt;Doe&gt; &amp; Co O&#39;Connor');
+
+    // El nombre de usuario debe estar codificado en la URL dentro del enlace de activación
+    const encodedUser = encodeURIComponent(user.username);
+    expect(html).toContain(`username=${encodedUser}`);
+
+    // Asegurarse de que no se inyecte HTML sin procesar desde los nombres
+    expect(html).not.toContain('<img');
   });
 
   it('createUser', async () => {
