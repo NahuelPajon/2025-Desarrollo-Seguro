@@ -43,15 +43,15 @@ class AuthService {
         pass: process.env.SMTP_PASS
       }
     });
-    const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${user.username}`;
+    const link = `${process.env.FRONTEND_URL}/activate-user?token=${invite_token}&username=${encodeURIComponent(user.username)}`;
 
     const sanitizeForTemplate = (input: string): string => {
       return input
+        .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/&/g, '&amp;');
+        .replace(/'/g, '&#39;');
     };
 
     const safeFirstName = sanitizeForTemplate(user.first_name);

@@ -6,6 +6,7 @@ import { setupSwagger } from './swagger'
 
 import userRoutes from './routes/user.routes';
 import authRoutes from './routes/auth.routes';
+import authController from './controllers/authController';
 
 import clinicalHistoryRoutes from './routes/clinicalhistory.routes';
 import invoiceRoutes from './routes/invoices.routes';

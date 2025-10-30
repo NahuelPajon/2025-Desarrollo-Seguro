@@ -57,6 +57,7 @@ const setPassword = async (req: Request, res: Response, next: NextFunction) => {
 
 const createUser = async (req: Request, res: Response, next: NextFunction) => {
   const { username, password, email, first_name, last_name } = req.body;
+  console.log(req.body);
   try {
     const user: User = {
       username,

@@ -14,19 +14,21 @@ interface InvoiceRow {
 }
 
 class InvoiceService {
-  static async list( userId: string, status?: string, operator?: string): Promise<Invoice[]> {
+  static async list( userId: string, status?: string, operator?: string ): Promise<Invoice[]> {
     let q = db<InvoiceRow>('invoices').where({ userId: userId });
-    if (status && operator) {
-      switch (operator) {
-        case 'eq':
-          q = q.andWhere('status', '=', status);
-          break;
-        case 'ne':
-          q = q.andWhere('status', '!=', status);
-          break;
-        default:
-          q = q.andWhere('status', '=', status);
-      }
+
+    const allowedOperators = ['eq', 'ne'];
+    const allowedStatuses = ['paid', 'unpaid'];
+
+    if (operator && !allowedOperators.includes(operator)) {
+      throw new Error('Invalid operator');
+    }
+    if (status && !allowedStatuses.includes(status)) {
+      throw new Error('Invalid status');
+    }
+
+    if (operator && status) {
+      q = q.andWhereRaw(` status ${operator} '${status}'`)
     }
 
     const rows = await q.select();
